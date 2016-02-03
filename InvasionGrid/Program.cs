@@ -14,6 +14,9 @@ namespace InvasionGrid
         static void Main(string[] args)
         {
             Console.WriteLine("Hello World!");
+
+            Game IG = new Game();
+            IG.Run();
         }
     }
 }
