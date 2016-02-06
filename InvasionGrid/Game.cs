@@ -33,7 +33,6 @@ namespace InvasionGrid
         public void Run()
         {
             //initialization
-
             window.SetActive();
 
             //loop
