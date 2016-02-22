@@ -129,5 +129,11 @@ namespace InvasionGrid.GameStates
             return null;
         }
 
+        
+        override public SystemMessage HandleMouseMoveInput(Window window, MouseMoveEventArgs e) { return null; }
+        override public SystemMessage HandleMousePressInput(Window window, MouseButtonEventArgs e) { return null; }
+        override public SystemMessage HandleMouseReleaseInput(Window window, MouseButtonEventArgs e) { return null; }
+        override public SystemMessage HandleMouseWheelInput(Window window, MouseWheelEventArgs e) { return null; }
+    
     }
 }

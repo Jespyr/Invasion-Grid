@@ -32,6 +32,10 @@ namespace InvasionGrid
             window = new RenderWindow(new VideoMode(800, 600), "Invasion Grid");
             window.Closed += new EventHandler(OnClosed);
             window.KeyPressed += new EventHandler<KeyEventArgs>(OnKeyPressed);
+            window.MouseMoved += new EventHandler<MouseMoveEventArgs>(OnMouseMoved);
+            window.MouseButtonPressed += new EventHandler<MouseButtonEventArgs>(OnMouseButtonPressed);
+            window.MouseButtonReleased += new EventHandler<MouseButtonEventArgs>(OnMouseButtonReleased);
+            window.MouseWheelMoved += new EventHandler<MouseWheelEventArgs>(OnMouseWheelMoved);
 
             //set us up with the first game state (the menu)
             GameStates = new Stack<GameState>();
@@ -75,7 +79,6 @@ namespace InvasionGrid
         {
             Window window = (Window)sender;
             window.Close();
-            //shutdown code
         }
 
         private void OnKeyPressed(object sender, KeyEventArgs e)
@@ -84,7 +87,26 @@ namespace InvasionGrid
             curMessage = GameStates.Peek().HandleKeyInput((Window)sender, e); //delegate the key handling to our current state
 
             HandleSystemMessage(curMessage);
+        }
 
+        private void OnMouseMoved(object sender, MouseMoveEventArgs e)
+        {
+            GameStates.Peek().HandleMouseMoveInput((Window)sender, e);
+        }
+
+        private void OnMouseButtonPressed(object sender, MouseButtonEventArgs e)
+        {
+            GameStates.Peek().HandleMousePressInput((Window)sender, e);
+        }
+
+        private void OnMouseButtonReleased(object sender, MouseButtonEventArgs e)
+        {
+            GameStates.Peek().HandleMouseReleaseInput((Window)sender, e);
+        }
+
+        private void OnMouseWheelMoved(object sender, MouseWheelEventArgs e)
+        {
+            GameStates.Peek().HandleMouseWheelInput((Window)sender, e);
         }
 
         private void HandleSystemMessage(SystemMessage curMessage)

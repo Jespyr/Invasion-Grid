@@ -19,6 +19,7 @@ using System.Threading.Tasks;
 
 //-Nick Carpenetti
 //CSE 265 Winter 2016
+//Assignment 2
 
 using SFML.System;
 using SFML.Window;
@@ -31,9 +32,10 @@ namespace InvasionGrid
         //Rendering stuff
         private CircleShape shape;
 
-        //AI stuff
-        //note: should this be an edge object instead?
-        private EasyGraphNode nextNode;     //the next node one needs to move to in order to reach the player with minimal damage
+        //AI stuff (Dijkstra)
+        public bool visited;            //whether this node has been visited by Dijkstra's algorithm (should this be public?)
+        public EasyGraphNode parent;    //the parent node in a shortest path from the enemy
+        public double distance;            //the distance to the parent
 
         private LinkedList<EasyGraphEdge> edges;
 
@@ -44,41 +46,85 @@ namespace InvasionGrid
             shape = new CircleShape(20.0f);
             shape.Origin = new Vector2f(20.0f, 20.0f);  //set the origin to the center of the object to make things easier
             shape.Position = position;
-            shape.FillColor = Color.Green;
-            //shape.OutlineColor = Color.Cyan;
+            shape.FillColor = Color.Transparent;
+            shape.OutlineColor = Color.Cyan;
+            shape.OutlineThickness = 2.0f;
+
+            //Dijkstras
+            visited = false;
+            parent = null;
+            distance = double.PositiveInfinity;
         }
 
         public void addEdge(EasyGraphNode target, int weight)
         {
             if (target == null)
             {
-                //exception?
+                throw new ArgumentNullException("target", "Cannot add edge with null target!");
+            }
+
+            //artificial weight restrictions for easy mode. For now, just stick to weights >= 0
+            if(weight < 0)
+            {
+                Console.WriteLine("Cannot make an edge with weights < 0 in easy mode");
                 return;
             }
 
-            //check if the edge already exists (necessary?)
-            /*foreach (EasyGraphEdge edge in edges)
+            
+            foreach (EasyGraphEdge edge in edges)
             {
                 if (edge.getTarget() == target)
                 {
-                    //exception: edge already exists!
+                    Console.WriteLine("Cannot add an edge here, one already exists!");
+                    return;
                 }
-            }*/
-
-
-            //perhaps insert some artificial wight restrictions?
+            }
 
             //finally add the edge
             edges.AddLast(new EasyGraphEdge(this, target, weight));
         }
 
-        public void removeEdgeByDestination(EasyGraphNode destination)
+        public void addEdge(EasyGraphEdge edge)
         {
-            foreach(EasyGraphEdge edge in edges)            //i've got a nagging feeling this isn't as efficient as it could be
+            if(edge == null)
             {
-                if (edge.getTarget() == destination)
-                    edges.Remove(edge);
+                throw new ArgumentNullException("edge", "Exception! Cannot add null edge");
             }
+            edges.AddLast(edge);
+        }
+
+        public LinkedList<EasyGraphEdge> getEdges()
+        {
+            return edges;
+        }
+
+        public void RemoveEdgeByTarget(EasyGraphNode target)
+        {
+            //need to make a stack/queue or some other structure, because we can't remove edges
+            //immediately
+            Stack<EasyGraphEdge> toRemove = new Stack<EasyGraphEdge>(); 
+            foreach(EasyGraphEdge edge in edges)
+            {
+                if (edge.getTarget() == target)
+                    toRemove.Push(edge);
+            }
+            
+            while(toRemove.Count > 0)
+            {
+                edges.Remove(toRemove.Pop());
+            }
+        }
+
+        public EasyGraphEdge GetEdgeByTarget(EasyGraphNode target)
+        {
+            foreach(EasyGraphEdge e in edges)
+            {
+                if(e.getTarget() == target)
+                {
+                    return e;
+                }
+            }
+            return null;
         }
 
 
@@ -100,10 +146,7 @@ namespace InvasionGrid
                 e.Draw(window);
             }
 
-            
         }
-
-
     }
     
     class EasyGraphEdge
@@ -135,26 +178,18 @@ namespace InvasionGrid
             float lineLength = (float)Math.Sqrt(vec.X * vec.X + vec.Y * vec.Y);
             Vector2f unitVec = vec / lineLength;
 
-            line.Size = new Vector2f(4.0f, lineLength - (source.getRadius() + target.getRadius())); //could just use one of the radii * 2, but this leaves the option of variable node sizes open
-            line.Origin = line.Size / 2.0f; //puts the origin at the center of the line
+            line.Size = new Vector2f(4.0f, lineLength - (source.getRadius() + target.getRadius()) - 4.0f);              //could just use one of the radii * 2, but this leaves the option of variable node sizes open
+            line.Origin = line.Size / 2.0f;                                                                             //puts the origin at the center of the line
             line.Position = source.getPosition() + vec / 2.0f;
             line.Rotation = (float)(Math.Atan2(vec.Y, vec.X) * 180.0f / Math.PI)+ 90.0f;
-            line.FillColor = Color.Red;
-
-            Console.WriteLine("Vec: " + vec);
-            Console.WriteLine("unitvec:" + unitVec);
-            Console.WriteLine("line length: " + lineLength);
-            Console.WriteLine("rotation: " + line.Rotation);
-
-            
+            line.FillColor = Color.Red;            
 
             //the point of the arrow
-            arrow = new CircleShape(10.0f, 3);                   //a circle shape with 3 sides is a triangle
+            arrow = new CircleShape(10.0f, 3);                                                                          //a circle shape with 3 sides is a triangle
             arrow.Origin = new Vector2f(arrow.Radius, arrow.Radius);
             arrow.Rotation = line.Rotation;
-            arrow.Position = target.getPosition() + -unitVec * (target.getRadius() + arrow.Radius - 2.0f); //back off enough so the arrow points to the edge of the target
+            arrow.Position = target.getPosition() + -unitVec * (target.getRadius() + arrow.Radius + 2.0f);              //back off enough so the arrow points to the edge of the target
             arrow.FillColor = line.FillColor;
-            Console.WriteLine("arrowpos:" + arrow.Position);
 
 
             //the weight indicator
@@ -191,75 +226,295 @@ namespace InvasionGrid
             window.Draw(arrow);
             window.Draw(weightText);
         }
+
+        public void Highlight()
+        {
+            line.FillColor = Color.Blue;
+            arrow.FillColor = Color.Blue;
+        }
+        public void Unhighlight()
+        {
+            line.FillColor = Color.Red;
+            arrow.FillColor = Color.Red;
+        }
     }
+
+
 
     class EasyGraph
     {
-        
-        private List<EasyGraphNode> NodeList;
+
+        private List<EasyGraphNode> nodeList;
+        private List<EasyGraphEdge> edgeList;
 
         public EasyGraph()
         {
-            NodeList = new List<EasyGraphNode>();
+            nodeList = new List<EasyGraphNode>();
+            edgeList = new List<EasyGraphEdge>();
         }
 
         public void Clear()
         {
-            NodeList.Clear();
+            Console.WriteLine("Clearing all edges and nodes");
+            nodeList.Clear();
         }
 
         public void AddNode(EasyGraphNode n)
         {
-            if(NodeList.Contains(n))
+            if (nodeList.Contains(n))
             {
-                //exception!
+                Console.WriteLine("This node already exists!");
                 return;
             }
-            NodeList.Add(n);
+            nodeList.Add(n);
         }
 
         public EasyGraphNode MakeNode(Vector2f position)
         {
             EasyGraphNode newNode = new EasyGraphNode(position);
-            NodeList.Add(newNode);
+            nodeList.Add(newNode);
             return newNode;
         }
 
         public void RemoveNode(EasyGraphNode node)
         {
-            NodeList.Remove(node);
-            //afterwards we need to remove all edges pointing
-            //to the now nonexistent node
-            foreach(EasyGraphNode n in NodeList)
+            //remove all edges pointing to the soon to be nonexistent node
+            foreach (EasyGraphNode n in nodeList)
             {
-                //test if it has an edge pointing to n
-                //remove the edge
-                n.removeEdgeByDestination(node);
+                n.RemoveEdgeByTarget(node);
+
             }
+
+            nodeList.Remove(node);
+
         }
-        
-        public void MakeEdge(EasyGraphNode curNode, EasyGraphNode dest, int weight)
+
+        public void MakeEdge(EasyGraphNode sourceNode, EasyGraphNode destNode, int weight)
         {
-               
-            curNode.addEdge(dest, weight);
+            if (sourceNode == null)
+            {
+                throw new ArgumentNullException("sourceNode", "Exception: Cannot make edge, destNode is null");
+            }
+            else if (destNode == null)
+            {
+                throw new ArgumentNullException("destNode", "Exception: Cannot make edge, destNode is null");
+            }
+
+            EasyGraphEdge newEdge = new EasyGraphEdge(sourceNode, destNode, weight);
+            edgeList.Add(newEdge);
+            sourceNode.addEdge(newEdge);
         }
+
 
         public void RemoveEdge(EasyGraphNode sourceNode, EasyGraphNode destNode)
         {
+            if (sourceNode == null)
+            {
+                throw new ArgumentNullException("sourceNode", "Exception: Cannot remove edge, destNode is null");
+            }
+            else if (destNode == null)
+            {
+                throw new ArgumentNullException("destNode", "Exception: Cannot remove edge, destNode is null");
+            }
+
+            sourceNode.RemoveEdgeByTarget(destNode);
+
+        }
+
+        public void FindPathFromEnemy(EasyGraphNode sourceNode, EasyGraphNode targetNode)
+        {
+            if(sourceNode == null || targetNode == null)
+            {
+                Console.Write("Cannot find path, either no source node, or no target node");
+                return;
+            }
+
+            //unhighlight the current path
+            foreach(EasyGraphEdge e in edgeList)
+            {
+                e.Unhighlight();
+            }
+
+            //set some starting values
+            foreach (EasyGraphNode n in nodeList)
+            {
+                n.visited = false;
+                n.parent = null;
+                n.distance = double.PositiveInfinity;
+            }
+
+            NodePriorityQueue Q = new NodePriorityQueue(nodeList.Count);
+            Q.Enqueue(sourceNode);
+            sourceNode.visited = true;
+            sourceNode.distance = 0;
+            sourceNode.parent = null;
+            while (!Q.isEmpty())
+            {
+                EasyGraphNode curNode = Q.Dequque();
+                foreach (EasyGraphEdge edge in curNode.getEdges())
+                {
+                    EasyGraphNode next = edge.getTarget();
+                    if (!next.visited)
+                    {
+                        next.visited = true;
+                        next.distance = curNode.distance + edge.getWeight();
+                        next.parent = curNode;
+                        Q.Enqueue(next);
+                    }
+                    else
+                    {
+                        if (next.distance > curNode.distance + edge.getWeight())
+                        {
+                            next.distance = curNode.distance + edge.getWeight();
+                            next.parent = curNode;
+                            Q.Enqueue(next);
+                        }
+                    }
+                }
+            }
+
+            //let's highlight the new path! (probably should put this in a different function)
+            EasyGraphNode tmpNode = targetNode;
+            while (tmpNode != null && tmpNode != sourceNode)
+            {
+                tmpNode.parent.GetEdgeByTarget(tmpNode).Highlight();
+                tmpNode = tmpNode.parent;
+            }
 
         }
 
         //code for drawing our graph on the screen using SFML
         public void Draw(RenderWindow window)
         {
-            foreach(EasyGraphNode n in NodeList)
+            foreach (EasyGraphNode n in nodeList)
             {
-                //draw the node as a 10 unit white circle (for now)
                 n.Draw(window);
-                
             }
         }
 
-        
+        public List<EasyGraphNode> getNodeList()
+        {
+            return nodeList;
+        }
     }
+
+    //we have to make our own priority queue class apparently because .Net doesn't have one :(
+    class NodePriorityQueue
+    {
+
+        private EasyGraphNode[] data;
+        private int effectiveLength;
+
+        public NodePriorityQueue(int size)
+        {
+            //instead of dealing with weird .Net list restrictions concerning .Count, etc
+            //make an array that can hold all the nodes (the queue will never need more than
+            //that)
+            data = new EasyGraphNode[size];
+            effectiveLength = 0;
+        }
+
+        public void Enqueue(EasyGraphNode node)
+        {
+            if(data.Length == effectiveLength)
+            {
+                throw new OverflowException("Queue full! Cannot enqueue");
+            }
+
+            effectiveLength++;
+            int i;
+            for(i = effectiveLength-1; i > 0 && node.distance < data[Parent(i)].distance; i = Parent(i))
+            {
+                data[i] = data[Parent(i)];
+            }
+            data[i] = node;
+        }
+        public EasyGraphNode Dequque()
+        {
+            EasyGraphNode min = data[0];
+
+            data[0] = data[effectiveLength-1];
+
+            effectiveLength--;
+            Heapify(0);
+            return min;
+        }
+        public EasyGraphNode Peek()
+        {
+            return data[0];
+        }
+
+        public bool isEmpty()
+        {
+            return effectiveLength == 0;
+        }
+
+
+        public void BuildHeap()
+        {
+            effectiveLength = data.Length - 1;
+            for(int i = effectiveLength / 2; i >= 0; i--)
+            {
+                Heapify(i);
+            }
+        }
+
+        public void Heapify(int i)
+        {
+            int smallestIndex;
+            int l = LeftChild(i);
+            int r = RightChild(i);
+
+            if (l < effectiveLength && data[l].distance < data[i].distance)
+            {
+                smallestIndex = l;
+            }
+            else
+            {
+                smallestIndex = i;
+            }
+
+            if (r < effectiveLength && data[r].distance < data[smallestIndex].distance)
+            {
+                smallestIndex = r;
+            }
+
+            if (i != smallestIndex)
+            {
+                Swap(i, smallestIndex);
+                Heapify(smallestIndex);
+            }
+        }
+
+        private int Parent(int i)
+        {
+            return (i - 1) / 2;
+        }
+        private int LeftChild(int i)
+        {
+            return 2 * i + 1;
+        }
+        private int RightChild(int i)
+        {
+            return 2 * i + 2;
+        }
+        private void Swap(int first, int second)        //swap two items in the priority queue
+        {
+            if (first < 0 || first >= data.Length)
+            {
+                throw new IndexOutOfRangeException("NodePriorityQueue.Swap() failed, first index out of bounds");
+            }
+            if (second < 0 || second >= data.Length)    //should i use effective length instead?
+            {
+                throw new IndexOutOfRangeException("NodePriorityQueue.Swap() failed, second index out of bounds");
+            }
+
+            EasyGraphNode tmp = data[first];
+            data[first] = data[second];
+            data[second] = tmp;
+        }
+    }
+
+        
+    
 }

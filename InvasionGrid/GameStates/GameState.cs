@@ -23,6 +23,11 @@ namespace InvasionGrid.GameStates
         abstract public void Update(Time timeElapsed);              //a method to handle updating the state of our....state :/
         abstract public void Draw(RenderWindow window);
         abstract public SystemMessage HandleKeyInput(Window window, KeyEventArgs e);
-        
+        abstract public SystemMessage HandleMouseMoveInput(Window window, MouseMoveEventArgs e);
+        abstract public SystemMessage HandleMousePressInput(Window window, MouseButtonEventArgs e);
+        abstract public SystemMessage HandleMouseReleaseInput(Window window, MouseButtonEventArgs e);
+        abstract public SystemMessage HandleMouseWheelInput(Window window, MouseWheelEventArgs e);
+
+
     }
 }
